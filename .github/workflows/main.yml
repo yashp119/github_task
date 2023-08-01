@@ -1,9 +1,9 @@
-name: Deploy PHP Application to EC2
+name: PHP Application Deployment
 
 on:
   push:
     branches:
-      - master  # Adjust to your main branch name
+      - master # Adjust to your main branch name
 
 jobs:
   deploy:
@@ -12,16 +12,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install and configure dependencies
+      - name: Set up SSH key
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install awscli
+          mkdir -p ~/.ssh
+          echo "$EC2_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-      - name: Copy deploy.sh to EC2
+      - name: Deploy to EC2
         run: |
-          scp -i ${{ secrets.EC2_PRIVATE_KEY }} -o StrictHostKeyChecking=no deploy.sh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:~
-
-      - name: Execute deploy.sh on EC2
-        run: |
-          ssh -i ${{ secrets.EC2_PRIVATE_KEY }} -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} './deploy.sh'
+          sudo apt update
+          sudo apt install -y sshpass
+          sshpass -p "" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/id_rsa $EC2_USERNAME@$EC2_HOST "sudo apt update && sudo apt install -y apache2 mysql-server php libapache2-mod-php php-mysql && sudo systemctl start apache2 && sudo systemctl start mysql && sudo systemctl enable apache2 && sudo systemctl enable mysql && sudo mysql_secure_installation"
+          sshpass -p "" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/id_rsa -r . $EC2_USERNAME@$EC2_HOST:/var/www/html/
